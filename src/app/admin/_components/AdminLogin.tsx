@@ -48,10 +48,6 @@ export default function AdminLogin() {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-[11px] text-neutral-400">
-          Démo : mot de passe par défaut <code className="font-mono">touba-infos</code>
-          <br />(définir <code className="font-mono">TI_ADMIN_PASSWORD</code> en production)
-        </p>
       </div>
     </div>
   );
