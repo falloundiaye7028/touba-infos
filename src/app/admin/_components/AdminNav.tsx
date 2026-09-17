@@ -2,15 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Newspaper, PlusCircle, Radar, Share2, BookOpen } from "lucide-react";
+import { LayoutDashboard, Newspaper, PlusCircle, BookOpen } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Tableau de bord", Icon: LayoutDashboard, exact: true },
   { href: "/admin/articles", label: "Articles", Icon: Newspaper, exact: false },
   { href: "/admin/articles/new", label: "Nouvel article", Icon: PlusCircle, exact: false },
   { href: "/admin/ebooks", label: "Ebooks", Icon: BookOpen, exact: false },
-  { href: "/admin/agent", label: "Agent IA", Icon: Radar, exact: false },
-  { href: "/admin/diffusion", label: "Diffusion", Icon: Share2, exact: false },
 ];
 
 export default function AdminNav() {

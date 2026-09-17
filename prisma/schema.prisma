@@ -41,42 +41,9 @@ model InfoArticle {
   @@map("info_articles")
 }
 
-model InfoSujet {
-  id            String    @id
-  titre         String
-  sourceNom     String
-  sourceId      String
-  url           String
-  resume        String    @db.Text
-  categorie     String
-  score         Int
-  scoreDetail   Json
-  confiance     String
-  nbSources     Int
-  autresSources Json
-  detecteA      DateTime
-  publieA       DateTime?
-  statut        String    @default("detecte")
-  tags          String[]
-  hash          String
-  demo          Boolean   @default(false)
 
-  @@index([hash])
-  @@index([statut])
-  @@map("info_sujets")
-}
 
-model InfoVeilleRun {
-  id         String   @id @default(cuid())
-  at         DateTime @default(now())
-  consultees Int
-  detectes   Int
-  nouveaux   Int
-  erreurs    String[]
-  mode       String
 
-  @@map("info_veille_runs")
-}
 
 model InfoEbook {
   id          String   @id @default(cuid())

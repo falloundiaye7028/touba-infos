@@ -282,7 +282,7 @@ export const AUTEURS: AuteurInfo[] = [
     slug: "redaction-touba-infos",
     nom: "Rédaction Touba Infos",
     role: "Rédaction",
-    bio: "Articles préparés par la rédaction de Touba Infos à partir d'informations vérifiées provenant de plusieurs sources publiques, avec l'appui de l'agent éditorial IA et une relecture humaine.",
+    bio: "Articles préparés par la rédaction de Touba Infos à partir d'informations vérifiées provenant de plusieurs sources publiques, avec une relecture humaine.",
     initiales: "TI",
   },
   {
