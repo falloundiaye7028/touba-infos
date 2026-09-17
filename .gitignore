@@ -36,3 +36,4 @@ prisma/*.db
 # TypeScript build info
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+.env*
