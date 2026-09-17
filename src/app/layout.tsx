@@ -1,3 +1,4 @@
+import "./globals.css";
 import type { Metadata } from "next";
 import { MEDIA_URL } from "@/lib/touba-infos";
 import BreakingBar from "./_components/BreakingBar";
