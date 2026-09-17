@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { MEDIA_URL } from "@/lib/touba-infos";
+import { getActiveAd } from "@/lib/touba-infos-ads";
 import BreakingBar from "./_components/BreakingBar";
 import InfosHeader from "./_components/InfosHeader";
 import InfosFooter from "./_components/InfosFooter";
@@ -74,11 +75,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ToubaInfosLayout({
+export default async function ToubaInfosLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const topAd = await getActiveAd("top");
+
   return (
     <div className="ti-root min-h-screen bg-[#ffffff] text-neutral-900">
       <InfosChrome
@@ -87,6 +90,7 @@ export default function ToubaInfosLayout({
         footer={<InfosFooter />}
         bottomNav={<MobileBottomNav />}
         whatsapp={<InfosWhatsApp />}
+        topAd={topAd}
         jsonLd={
           <>
             <script

@@ -7,6 +7,7 @@ import {
   formatDateFr,
 } from "@/lib/touba-infos";
 import EditorialImage from "./EditorialImage";
+import { getActiveAd, listAds } from "@/lib/touba-infos-ads";
 
 export { default as EditorialImage } from "./EditorialImage";
 
@@ -305,5 +306,57 @@ export function AdSlot({
         </Link>
       </span>
     </div>
+  );
+}
+
+export async function ManagedAd({ position }: { position: string }) {
+  const ad = await getActiveAd(position);
+  if (!ad) {
+    return (
+      <div className="flex h-20 w-full flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 text-center text-neutral-700 md:h-24">
+        <span className="text-xs font-bold uppercase tracking-[0.2em]">Publicité</span>
+        <span className="mt-2 text-sm leading-relaxed">
+          Espace disponible —{" "}
+          <Link href="/publicite" className="font-semibold text-green-700 hover:underline">
+            communiquez sur Touba Infos
+          </Link>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <a
+      href={ad.linkUrl}
+      target="_blank"
+      rel="sponsored noopener noreferrer"
+      aria-label={ad.name}
+      className="group block w-full overflow-hidden rounded-xl bg-neutral-100"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={ad.imageUrl} alt={ad.name} className="h-auto w-full" loading="lazy" />
+    </a>
+  );
+}
+
+export async function SidebarAds() {
+  const ads = (await listAds()).filter((a) => a.position === "sidebar" && a.active);
+  if (ads.length === 0) {
+    return <ManagedAd position="sidebar" />;
+  }
+  return (
+    <>
+      {ads.map((ad) => (
+        <a
+          key={ad.id}
+          href={ad.linkUrl}
+          target="_blank"
+          rel="sponsored noopener noreferrer"
+          className="group block overflow-hidden rounded-xl bg-neutral-100"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={ad.imageUrl} alt={ad.name} className="h-auto w-full" loading="lazy" />
+        </a>
+      ))}
+    </>
   );
 }

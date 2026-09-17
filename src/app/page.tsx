@@ -3,13 +3,14 @@ import { AlertCircle, ArrowRight, Bell, Newspaper, PlayCircle, Send } from "luci
 import { slugCategorie, type ArticleInfo } from "@/lib/touba-infos";
 import { getArticlesTries } from "@/lib/touba-infos-store";
 import {
-  AdSlot,
   CardCompact,
   CardHorizontal,
   CardStandard,
   CategorieChip,
   EditorialImage,
+  ManagedAd,
   SectionHeading,
+  SidebarAds,
 } from "./_components/ui";
 
 export const revalidate = 20;
@@ -43,7 +44,7 @@ export default async function ToubaInfosHome() {
         <TopHeadlines une={une} manchettes={manchettes} />
 
         <section className="mx-auto max-w-[1400px] px-4 py-8">
-          <AdSlot format="leaderboard" />
+          <ManagedAd position="leaderboard" />
         </section>
 
         <section className="mx-auto grid max-w-[1400px] gap-8 px-4 pb-12 lg:grid-cols-[minmax(0,1fr)_330px]">
@@ -74,7 +75,7 @@ export default async function ToubaInfosHome() {
                 ))}
               </div>
             </div>
-            <AdSlot format="rectangle" />
+            <SidebarAds />
             <div className="bg-neutral-950 p-6 text-white">
               <p className="text-xs font-black uppercase tracking-[0.2em] text-green-400">Touba Infos</p>
               <h2 className="mt-3 text-2xl font-black leading-tight">Toute l’actualité, directement dans votre boîte mail.</h2>
@@ -83,8 +84,6 @@ export default async function ToubaInfosHome() {
                 S’abonner <ArrowRight size={16} />
               </Link>
             </div>
-            <AdSlot format="skyscraper" />
-            <AdSlot format="intelligence-btp" />
           </aside>
         </section>
 

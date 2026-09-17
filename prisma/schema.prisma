@@ -89,6 +89,21 @@ model InfoEbookOrder {
   @@map("info_ebook_orders")
 }
 
+model InfoAd {
+  id        String   @id @default(cuid())
+  name      String
+  position  String   @default("sidebar")
+  imageUrl  String
+  linkUrl   String
+  label     String   @default("Publicité")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position, active])
+  @@map("info_ads")
+}
+
 enum InfoEbookKind {
   FREE
   PAID
