@@ -115,7 +115,7 @@ export default function InfosHeader() {
     <header className="sticky top-0 z-50 bg-white">
       {/* ── TOP BAR ── */}
       <div
-        className={`overflow-hidden border-b border-neutral-100 bg-neutral-50 text-neutral-500 transition-all duration-300 ${
+        className={`overflow-hidden border-b border-neutral-100 bg-neutral-50 text-neutral-500 ${
           compact ? "max-h-0 opacity-0" : "max-h-12 opacity-100"
         }`}
       >
@@ -154,7 +154,7 @@ export default function InfosHeader() {
       {/* ── MASTHEAD ── */}
       <div className="border-b border-neutral-100">
         <div
-          className={`mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 transition-all duration-300 ${
+          className={`mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 ${
             compact ? "py-2" : "py-3.5"
           }`}
         >
