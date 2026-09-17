@@ -1,0 +1,1 @@
+import EbookForm from "../EbookForm"; import { saveEbook } from "../actions"; export default function New(){return <div><h1 className="mb-6 text-2xl font-black">Nouvel ebook</h1><EbookForm action={saveEbook.bind(null,undefined)}/></div>}

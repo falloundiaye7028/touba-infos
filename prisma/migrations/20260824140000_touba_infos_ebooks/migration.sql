@@ -1,0 +1,13 @@
+CREATE TYPE "InfoEbookKind" AS ENUM ('FREE', 'PAID');
+CREATE TYPE "InfoEbookStatus" AS ENUM ('DRAFT', 'PUBLISHED');
+CREATE TYPE "InfoEbookPaymentMethod" AS ENUM ('WAVE', 'ORANGE_MONEY');
+CREATE TYPE "InfoEbookOrderStatus" AS ENUM ('PENDING', 'PAID', 'FAILED');
+CREATE TABLE "info_ebooks" ("id" TEXT NOT NULL, "slug" TEXT NOT NULL, "title" TEXT NOT NULL, "author" TEXT NOT NULL, "description" TEXT NOT NULL, "category" TEXT NOT NULL, "coverUrl" TEXT, "pdfPathname" TEXT NOT NULL, "kind" "InfoEbookKind" NOT NULL DEFAULT 'FREE', "priceXof" INTEGER NOT NULL DEFAULT 0, "status" "InfoEbookStatus" NOT NULL DEFAULT 'DRAFT', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "info_ebooks_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "info_ebooks_slug_key" ON "info_ebooks"("slug");
+CREATE INDEX "info_ebooks_status_category_idx" ON "info_ebooks"("status", "category");
+CREATE TABLE "info_ebook_orders" ("id" TEXT NOT NULL, "ebookId" TEXT NOT NULL, "customerName" TEXT NOT NULL, "customerEmail" TEXT NOT NULL, "customerPhone" TEXT NOT NULL, "amountXof" INTEGER NOT NULL, "paymentMethod" "InfoEbookPaymentMethod", "status" "InfoEbookOrderStatus" NOT NULL DEFAULT 'PENDING', "paydunyaToken" TEXT, "paydunyaRef" TEXT, "downloadToken" TEXT, "downloadExpiresAt" TIMESTAMP(3), "paidAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "info_ebook_orders_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "info_ebook_orders_paydunyaToken_key" ON "info_ebook_orders"("paydunyaToken");
+CREATE UNIQUE INDEX "info_ebook_orders_paydunyaRef_key" ON "info_ebook_orders"("paydunyaRef");
+CREATE UNIQUE INDEX "info_ebook_orders_downloadToken_key" ON "info_ebook_orders"("downloadToken");
+CREATE INDEX "info_ebook_orders_ebookId_status_idx" ON "info_ebook_orders"("ebookId", "status");
+ALTER TABLE "info_ebook_orders" ADD CONSTRAINT "info_ebook_orders_ebookId_fkey" FOREIGN KEY ("ebookId") REFERENCES "info_ebooks"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

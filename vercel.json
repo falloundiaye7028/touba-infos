@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/touba-infos/agent/veille",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}

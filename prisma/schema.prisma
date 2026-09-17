@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model InfoArticle {
+  id            String    @id
+  slug          String    @unique
+  titre         String
+  sousTitre     String    @default("")
+  extrait       String    @default("") @db.Text
+  categorie     String
+  genre         String    @default("Actualité")
+  statut        String    @default("publie")
+  auteur        String
+  date          DateTime
+  miseAJour     DateTime?
+  tempsLecture  String    @default("3 min")
+  imageEmoji    String    @default("📰")
+  imageGradient String
+  imageUrl      String?
+  imageFocalX   Int       @default(50)
+  imageFocalY   Int       @default(50)
+  credit        String?
+  legende       String?
+  alaUne        Boolean   @default(false)
+  breaking      Boolean   @default(false)
+  epingle       Boolean   @default(false)
+  vues          Int       @default(0)
+  tags          String[]
+  contenu       String    @db.Text
+  youtubeId     String?
+  createdAt     DateTime  @default(now())
+
+  @@index([statut])
+  @@index([categorie])
+  @@map("info_articles")
+}
+
+model InfoSujet {
+  id            String    @id
+  titre         String
+  sourceNom     String
+  sourceId      String
+  url           String
+  resume        String    @db.Text
+  categorie     String
+  score         Int
+  scoreDetail   Json
+  confiance     String
+  nbSources     Int
+  autresSources Json
+  detecteA      DateTime
+  publieA       DateTime?
+  statut        String    @default("detecte")
+  tags          String[]
+  hash          String
+  demo          Boolean   @default(false)
+
+  @@index([hash])
+  @@index([statut])
+  @@map("info_sujets")
+}
+
+model InfoVeilleRun {
+  id         String   @id @default(cuid())
+  at         DateTime @default(now())
+  consultees Int
+  detectes   Int
+  nouveaux   Int
+  erreurs    String[]
+  mode       String
+
+  @@map("info_veille_runs")
+}
+
+model InfoEbook {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  author      String
+  description String   @db.Text
+  category    String
+  coverUrl    String?
+  coverFocalX Int       @default(50)
+  coverFocalY Int       @default(50)
+  pdfPathname String
+  kind        InfoEbookKind @default(FREE)
+  priceXof    Int      @default(0)
+  status      InfoEbookStatus @default(DRAFT)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orders      InfoEbookOrder[]
+
+  @@index([status, category])
+  @@map("info_ebooks")
+}
+
+model InfoEbookOrder {
+  id              String   @id @default(cuid())
+  ebookId         String
+  customerName    String
+  customerEmail   String
+  customerPhone   String
+  amountXof       Int
+  paymentMethod   InfoEbookPaymentMethod?
+  status          InfoEbookOrderStatus @default(PENDING)
+  paydunyaToken   String?  @unique
+  paydunyaRef     String?  @unique
+  downloadToken   String?  @unique
+  downloadExpiresAt DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  ebook           InfoEbook @relation(fields: [ebookId], references: [id], onDelete: Restrict)
+
+  @@index([ebookId, status])
+  @@map("info_ebook_orders")
+}
+
+enum InfoEbookKind {
+  FREE
+  PAID
+}
+
+enum InfoEbookStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum InfoEbookPaymentMethod {
+  WAVE
+  ORANGE_MONEY
+}
+
+enum InfoEbookOrderStatus {
+  PENDING
+  PAID
+  FAILED
+}

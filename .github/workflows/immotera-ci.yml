@@ -1,0 +1,32 @@
+name: IntelligenceImmobilier CI
+
+on:
+  pull_request:
+    paths: ["apps/immotera/**", ".github/workflows/immotera-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["apps/immotera/**", ".github/workflows/immotera-ci.yml"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/immotera
+    env:
+      DATABASE_URL: postgresql://intelligenceimmobilier:password@localhost:5432/intelligenceimmobilier
+      AUTH_SECRET: ci-only-secret-at-least-32-characters-long
+      DEMO_MODE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/immotera/package-lock.json
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

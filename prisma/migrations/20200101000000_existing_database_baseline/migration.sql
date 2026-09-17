@@ -1,0 +1,3 @@
+-- Baseline uniquement : l’état existant de la base Neon est enregistré dans
+-- _prisma_migrations par `prisma migrate resolve`. Cette migration ne doit
+-- jamais créer, modifier ou supprimer une table, un type, un index ou des données.

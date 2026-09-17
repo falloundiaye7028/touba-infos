@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server"; import { prisma } from "@/lib/db";
+export async function GET(_:Request,{params}:{params:Promise<{id:string}>}) { const {id}=await params; const order=await prisma.infoEbookOrder.findUnique({where:{id},select:{status:true,downloadToken:true,downloadExpiresAt:true}}); if(!order)return NextResponse.json({error:"Commande inconnue"},{status:404}); return NextResponse.json({status:order.status,downloadUrl:order.status==="PAID"&&order.downloadToken?`/api/touba-infos/ebooks/download/${order.downloadToken}`:null}); }
