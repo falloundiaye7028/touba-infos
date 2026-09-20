@@ -155,6 +155,15 @@ function estPublic(a: ArticleInfo): boolean {
   return (a.statut ?? "publie") === "publie";
 }
 
+/**
+ * Vrai si l'article a été généré par l'intégration AMY IA.
+ * L'endpoint incoming écrit `metadata.generatedBy = "amy-ia-solutions"`.
+ */
+export function isAIGenerated(a: ArticleInfo): boolean {
+  const generatedBy = a.metadata?.generatedBy;
+  return typeof generatedBy === "string" && generatedBy.startsWith("amy-ia");
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 //  Lecture publique
 // ════════════════════════════════════════════════════════════════════════════
@@ -381,4 +390,16 @@ export async function adminDelete(id: string): Promise<void> {
     fileCache = all.filter((a) => a.id !== id);
     await persistFile();
   }
+}
+
+/** Liste les brouillons générés par AMY IA en attente de validation. */
+export async function listAIDrafts(): Promise<ArticleInfo[]> {
+  return (await adminListAll()).filter(
+    (a) => isAIGenerated(a) && (a.statut ?? "publie") === "brouillon",
+  );
+}
+
+/** Publie un article (statut « publie »). */
+export async function publishArticle(id: string): Promise<void> {
+  await adminSetStatut(id, "publie");
 }
