@@ -13,7 +13,7 @@ import {
   SidebarAds,
 } from "./_components/ui";
 
-export const revalidate = 20;
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: { absolute: "Touba Infos — L’actualité de Touba, du Sénégal et du monde" },

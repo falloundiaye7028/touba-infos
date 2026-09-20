@@ -3,16 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import {
-  CATEGORIES_INFO,
-  CATEGORIES_PLUS,
   categorieFromSlug,
   genreFromSlug,
-  slugCategorie,
   GENRE_LABEL_PLURIEL,
   EMOJI_CATEGORIES,
   MEDIA_URL,
   type ArticleInfo,
-  type CategorieInfo,
 } from "@/lib/touba-infos";
 import {
   getArticlesInfoByCategorie,
@@ -20,9 +16,7 @@ import {
 } from "@/lib/touba-infos-store";
 import { CardStandard, CardHorizontal, EditorialImage, CategorieChip } from "../../_components/ui";
 
-export const revalidate = 20;
-
-const GENRE_SLUGS = ["interviews", "analyses", "tribunes", "communiques", "reportages"];
+export const dynamic = "force-dynamic";
 
 async function resolve(slug: string): Promise<{
   titre: string;
@@ -49,14 +43,6 @@ async function resolve(slug: string): Promise<{
     };
   }
   return null;
-}
-
-export function generateStaticParams() {
-  const cats = [...CATEGORIES_INFO, ...CATEGORIES_PLUS].map((c) => ({
-    slug: slugCategorie(c as CategorieInfo),
-  }));
-  const genres = GENRE_SLUGS.map((slug) => ({ slug }));
-  return [...cats, ...genres];
 }
 
 export async function generateMetadata({

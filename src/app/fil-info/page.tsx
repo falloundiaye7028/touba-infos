@@ -4,7 +4,7 @@ import { formatDateFr, formatHeureFr, type ArticleInfo } from "@/lib/touba-infos
 import { getArticlesTries } from "@/lib/touba-infos-store";
 import { CategorieChip } from "../_components/ui";
 
-export const revalidate = 20;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Fil info — Toutes les dernières actualités en continu",
