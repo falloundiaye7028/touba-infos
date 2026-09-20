@@ -68,6 +68,7 @@ export async function POST(request: Request): Promise<Response> {
     auteur: "Rédaction Touba Infos",
     extrait: input.meta?.description ?? "",
     tags: input.meta?.keywords ?? [],
+    imageUrl: input.imageUrl,
     contenu: input.body,
     statut: "brouillon",
     metadata: {

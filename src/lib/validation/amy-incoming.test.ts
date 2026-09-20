@@ -60,4 +60,25 @@ describe("amyIncomingSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.categorie).toBe("Touba");
   });
+
+  it("accepte une imageUrl valide", () => {
+    const result = amyIncomingSchema.safeParse({
+      title: "Titre",
+      body: "Corps",
+      imageUrl: "https://example.com/image.jpg",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.imageUrl).toBe("https://example.com/image.jpg");
+    }
+  });
+
+  it("rejette une imageUrl invalide", () => {
+    const result = amyIncomingSchema.safeParse({
+      title: "Titre",
+      body: "Corps",
+      imageUrl: "pas-une-url",
+    });
+    expect(result.success).toBe(false);
+  });
 });

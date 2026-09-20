@@ -31,6 +31,7 @@ export const amyIncomingSchema = z.object({
       "Éducation",
     ])
     .default("Touba"),
+  imageUrl: z.string().url().optional(),
   sourceUrl: z.string().url().optional(),
 });
 
