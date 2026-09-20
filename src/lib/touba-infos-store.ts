@@ -83,6 +83,9 @@ function rowToArticle(r: NonNullable<Row>): ArticleInfo {
     tags: r.tags,
     contenu: r.contenu,
     youtubeId: r.youtubeId ?? undefined,
+    metadata: r.metadata
+      ? (r.metadata as Record<string, unknown>)
+      : undefined,
   };
 }
 
@@ -113,6 +116,7 @@ function toDb(a: ArticleInfo) {
     tags: a.tags,
     contenu: a.contenu,
     youtubeId: a.youtubeId ?? null,
+    metadata: (a.metadata ?? null) as import("@prisma/client").Prisma.InputJsonValue,
   };
 }
 
@@ -317,6 +321,7 @@ function construireArticle(
     vues: input.vues ?? 0,
     tags: input.tags ?? [],
     contenu: input.contenu ?? "<p></p>",
+    metadata: input.metadata,
   };
 }
 

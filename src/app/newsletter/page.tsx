@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Mail, Bell, CalendarClock, Star } from "lucide-react";
 import NewsletterForm from "../_components/NewsletterForm";
 
@@ -35,9 +36,9 @@ export default function NewsletterPage() {
         <p className="mt-3 text-center text-xs text-neutral-400">
           En vous abonnant, vous acceptez de recevoir la newsletter de Touba
           Infos. Consultez notre{" "}
-          <a href="/politique-editoriale#confidentialite" className="text-green-700 underline">
+          <Link href="/politique-editoriale#confidentialite" className="text-green-700 underline">
             politique de confidentialité
-          </a>
+          </Link>
           .
         </p>
       </div>

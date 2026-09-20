@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
@@ -24,7 +25,8 @@
     "react": "^18",
     "react-dom": "^18",
     "sharp": "^0.33.4",
-    "tailwind-merge": "^2.4.0"
+    "tailwind-merge": "^2.4.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^20",
