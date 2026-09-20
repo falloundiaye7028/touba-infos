@@ -35,4 +35,29 @@ describe("amyIncomingSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepte une catégorie valide", () => {
+    const result = amyIncomingSchema.safeParse({
+      title: "Titre",
+      body: "Corps",
+      categorie: "Religion",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.categorie).toBe("Religion");
+  });
+
+  it("rejette une catégorie inconnue", () => {
+    const result = amyIncomingSchema.safeParse({
+      title: "Titre",
+      body: "Corps",
+      categorie: "Inconnue",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("par défaut, la catégorie vaut « Touba »", () => {
+    const result = amyIncomingSchema.safeParse({ title: "Titre", body: "Corps" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.categorie).toBe("Touba");
+  });
 });

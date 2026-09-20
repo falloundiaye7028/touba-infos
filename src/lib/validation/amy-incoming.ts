@@ -16,6 +16,21 @@ export const amyIncomingSchema = z.object({
       twitter: z.string().optional(),
     })
     .optional(),
+  categorie: z
+    .enum([
+      "Touba",
+      "Politique",
+      "Société",
+      "Économie",
+      "Religion",
+      "Sport",
+      "Culture",
+      "International",
+      "Technologies",
+      "Santé",
+      "Éducation",
+    ])
+    .default("Touba"),
   sourceUrl: z.string().url().optional(),
 });
 
