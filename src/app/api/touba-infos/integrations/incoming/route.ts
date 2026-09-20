@@ -64,7 +64,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const article = await adminCreate({
     titre: input.title,
-    categorie: "Touba",
+    categorie: input.categorie,
     auteur: "Rédaction Touba Infos",
     extrait: input.meta?.description ?? "",
     tags: input.meta?.keywords ?? [],
