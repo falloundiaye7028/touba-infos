@@ -4,7 +4,7 @@ import { Radio, Youtube, Facebook, Calendar } from "lucide-react";
 import { formatDateFr } from "@/lib/touba-infos";
 import { getBreaking } from "@/lib/touba-infos-store";
 
-export const revalidate = 20;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "En direct — Touba Infos",

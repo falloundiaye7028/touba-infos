@@ -15,7 +15,7 @@ import { getArticlesInfoByCategorie, getArticlesTries } from "@/lib/touba-infos-
 import { CardStandard, CardHorizontal, SectionHeading } from "../_components/ui";
 import MagalCountdown from "../_components/MagalCountdown";
 
-export const revalidate = 20;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Grand Magal de Touba — Dossier spécial",

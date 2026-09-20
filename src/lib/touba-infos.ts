@@ -89,6 +89,8 @@ export interface ArticleInfo {
   contenu: string;
   /** Pour les contenus vidéo — id YouTube éventuel */
   youtubeId?: string;
+  /** Métadonnées d'intégration (ex. sourceUrl) pour traçabilité. */
+  metadata?: Record<string, unknown>;
 }
 
 export interface VideoInfo {

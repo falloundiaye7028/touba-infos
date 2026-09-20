@@ -7,10 +7,9 @@ import {
   getArticleInfoBySlug,
   getArticlesInfoSimilaires,
   getDernieres,
-  getPublishedSlugs,
 } from "@/lib/touba-infos-store";
 
-export const revalidate = 20;
+export const dynamic = "force-dynamic";
 import {
   CardStandard,
   CardHorizontal,
@@ -24,10 +23,6 @@ const SITE = MEDIA_URL;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-}
-
-export async function generateStaticParams() {
-  return (await getPublishedSlugs()).map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({

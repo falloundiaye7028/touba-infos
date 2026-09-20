@@ -1,5 +1,7 @@
 import { prisma } from "./db";
 
+const hasDb = !!process.env.DATABASE_URL;
+
 export type InfoAd = {
   id: string;
   name: string;
@@ -37,16 +39,19 @@ function rowToAd(r: {
 }
 
 export async function listAds(): Promise<InfoAd[]> {
+  if (!hasDb) return [];
   const rows = await prisma.infoAd.findMany({ orderBy: { createdAt: "asc" } });
   return rows.map(rowToAd);
 }
 
 export async function getAd(id: string): Promise<InfoAd | null> {
+  if (!hasDb) return null;
   const r = await prisma.infoAd.findUnique({ where: { id } });
   return r ? rowToAd(r) : null;
 }
 
 export async function getActiveAd(position: string): Promise<InfoAd | null> {
+  if (!hasDb) return null;
   const r = await prisma.infoAd.findFirst({
     where: { position, active: true },
     orderBy: { createdAt: "asc" },
