@@ -13,7 +13,7 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-const ALLOWED_IMAGE_HOSTS = ["seneweb.com", "lesoleil.sn"];
+const ALLOWED_IMAGE_HOSTS = ["seneweb.com", "lesoleil.sn", "aps.sn", "rfi.fr"];
 
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
