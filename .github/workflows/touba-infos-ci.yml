@@ -1,0 +1,74 @@
+name: Touba Infos CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: touba-infos-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Types, lint, tests, compilation et MCP
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Aucun secret de production : la base de données n'est pas utilisée
+      # (stockage fichier local) et le connecteur MCP reçoit un secret de
+      # TEST généré pendant le job (scripts/mcp-e2e-local.sh).
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Générer le client Prisma
+        run: npx prisma generate
+
+      - name: Vérifier les types
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests unitaires et d'intégration
+        run: npm test
+
+      - name: Compilation de production
+        run: npm run build
+
+      - name: Test MCP de bout en bout (client officiel du SDK)
+        run: npm run test:mcp-e2e
+
+      - name: Audit des dépendances de production (critiques)
+        run: npm audit --omit=dev --audit-level=critical
+
+  secrets:
+    name: Recherche de secrets dans les commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks (commits de la PR ou du push)
+        env:
+          RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}~1..{0}', github.sha) }}
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
+            detect --source /repo --no-banner --redact --verbose \
+            --log-opts="$RANGE"
