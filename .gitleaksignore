@@ -1,0 +1,7 @@
+# Faux positifs vérifiés à la main. Chaque entrée = empreinte exacte
+# (commit:fichier:règle:ligne), jamais un fichier ou une règle entière.
+#
+# Faux jeton Vercel Blob « vercel_blob_rw_AbC123_secret » utilisé par un test
+# de déduction d'hôte (aucune valeur réelle). Remplacé depuis par une valeur
+# assemblée à l'exécution.
+ce790a00b4fe3926402fce7d9400fa686c70545f:src/lib/integrations/__tests__/categories-content-images.test.ts:generic-api-key:97

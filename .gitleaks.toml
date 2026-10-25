@@ -1,0 +1,7 @@
+# Configuration gitleaks de Touba Infos : règles par défaut de gitleaks.
+# Toute exception doit être justifiée et limitée à des valeurs de TEST
+# connues ; ne jamais ajouter de chemin entier contenant du code réel.
+title = "Touba Infos"
+
+[extend]
+useDefault = true

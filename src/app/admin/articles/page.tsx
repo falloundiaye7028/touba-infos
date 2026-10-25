@@ -136,7 +136,9 @@ export default async function ArticlesAdmin({
                           >
                             {a.titre}
                           </Link>
-                          {isAIGenerated(a) && <AIDraftBadge />}
+                          {isAIGenerated(a) && (
+                            <AIDraftBadge origin={a.metadata?.generatedBy} />
+                          )}
                         </div>
                         <p className="text-xs text-neutral-400">{a.auteur}</p>
                       </div>
