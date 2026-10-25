@@ -5,7 +5,9 @@ import {
   createFakeStore,
 } from "@/lib/integrations/__tests__/fake-store";
 
-const store = vi.hoisted(() => ({ current: null as ReturnType<typeof createFakeStore> | null }));
+const store = vi.hoisted(() => ({
+  current: null as ReturnType<typeof createFakeStore> | null,
+}));
 
 vi.mock("@/lib/touba-infos-store", () => ({
   adminListAll: () => store.current!.adminListAll(),
@@ -17,7 +19,11 @@ import { DELETE, GET, POST } from "./route";
 const SECRET = "s".repeat(40);
 const URL = "https://toubainfos.com/api/touba-infos/mcp";
 
-function rpc(body: unknown, token: string | null = SECRET, contentType = "application/json") {
+function rpc(
+  body: unknown,
+  token: string | null = SECRET,
+  contentType = "application/json",
+) {
   const headers: Record<string, string> = { "content-type": contentType };
   if (token !== null) headers.authorization = `Bearer ${token}`;
   return new Request(URL, {
@@ -29,7 +35,12 @@ function rpc(body: unknown, token: string | null = SECRET, contentType = "applic
 
 async function call(name: string, args: unknown, id = 1) {
   const res = await POST(
-    rpc({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }),
+    rpc({
+      jsonrpc: "2.0",
+      id,
+      method: "tools/call",
+      params: { name, arguments: args },
+    }),
   );
   const json = await res.json();
   const text = json.result?.content?.[0]?.text;
@@ -56,14 +67,19 @@ describe("POST /api/touba-infos/mcp — sécurité", () => {
     vi.stubEnv("TOUBA_INFOS_INTEGRATION_SECRET", "secret-amy-different");
   });
 
-  it("répond 503 si le secret n'est pas configuré", async () => {
+  it("répond 401 si le secret n'est pas configuré (sans le révéler)", async () => {
     vi.stubEnv("TOUBA_INFOS_MCP_SECRET", "");
-    expect((await POST(rpc({ jsonrpc: "2.0", id: 1, method: "ping" }))).status).toBe(503);
+    expect(
+      (await POST(rpc({ jsonrpc: "2.0", id: 1, method: "ping" }))).status,
+    ).toBe(401);
   });
 
-  it("répond 503 si le secret est trop court", async () => {
+  it("répond 401 si le secret est trop court", async () => {
     vi.stubEnv("TOUBA_INFOS_MCP_SECRET", "court");
-    expect((await POST(rpc({ jsonrpc: "2.0", id: 1, method: "ping" }, "court"))).status).toBe(503);
+    expect(
+      (await POST(rpc({ jsonrpc: "2.0", id: 1, method: "ping" }, "court")))
+        .status,
+    ).toBe(401);
   });
 
   it.each([
@@ -71,7 +87,9 @@ describe("POST /api/touba-infos/mcp — sécurité", () => {
     ["mauvais jeton", "x".repeat(40)],
     ["secret AMY", "secret-amy-different"],
   ])("répond 401 %s", async (_label, token) => {
-    const res = await POST(rpc({ jsonrpc: "2.0", id: 1, method: "ping" }, token));
+    const res = await POST(
+      rpc({ jsonrpc: "2.0", id: 1, method: "ping" }, token),
+    );
     expect(res.status).toBe(401);
   });
 
@@ -81,13 +99,15 @@ describe("POST /api/touba-infos/mcp — sécurité", () => {
   });
 
   it("refuse une requête trop volumineuse", async () => {
-    const res = await POST(rpc(`{"x":"${"a".repeat(210_000)}"}`));
+    const res = await POST(rpc(`{"x":"${"a".repeat(300_000)}"}`));
     expect(res.status).toBe(413);
   });
 
   it("refuse le JSON invalide et les lots", async () => {
     expect((await POST(rpc("{pas du json"))).status).toBe(400);
-    expect((await POST(rpc([{ jsonrpc: "2.0", id: 1, method: "ping" }]))).status).toBe(400);
+    expect(
+      (await POST(rpc([{ jsonrpc: "2.0", id: 1, method: "ping" }]))).status,
+    ).toBe(400);
   });
 
   it("n'accepte que POST", async () => {
@@ -111,7 +131,11 @@ describe("POST /api/touba-infos/mcp — protocole et outils", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "initialize",
-        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } },
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "test", version: "1" },
+        },
       }),
     );
     const json = await res.json();
@@ -120,26 +144,40 @@ describe("POST /api/touba-infos/mcp — protocole et outils", () => {
   });
 
   it("répond 202 sans corps à une notification", async () => {
-    const res = await POST(rpc({ jsonrpc: "2.0", method: "notifications/initialized" }));
+    const res = await POST(
+      rpc({ jsonrpc: "2.0", method: "notifications/initialized" }),
+    );
     expect(res.status).toBe(202);
   });
 
   it("expose exactement trois outils", async () => {
-    const res = await POST(rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }));
-    const names = (await res.json()).result.tools.map((t: { name: string }) => t.name);
-    expect(names).toEqual(["creer_brouillon", "lister_brouillons", "lire_article"]);
+    const res = await POST(
+      rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
+    );
+    const names = (await res.json()).result.tools.map(
+      (t: { name: string }) => t.name,
+    );
+    expect(names).toEqual([
+      "creer_brouillon",
+      "lister_brouillons",
+      "lire_article",
+    ]);
   });
 
-  it.each(["publier_article", "modifier_article", "supprimer_article", "adminUpdate"])(
-    "refuse l'outil « %s »",
-    async (name) => {
-      const { json } = await call(name, {});
-      expect(json.error.code).toBe(-32602);
-    },
-  );
+  it.each([
+    "publier_article",
+    "modifier_article",
+    "supprimer_article",
+    "adminUpdate",
+  ])("refuse l'outil « %s »", async (name) => {
+    const { json } = await call(name, {});
+    expect(json.error.code).toBe(-32602);
+  });
 
   it("refuse les méthodes non prévues (resources, prompts…)", async () => {
-    const res = await POST(rpc({ jsonrpc: "2.0", id: 3, method: "resources/list" }));
+    const res = await POST(
+      rpc({ jsonrpc: "2.0", id: 3, method: "resources/list" }),
+    );
     expect((await res.json()).error.code).toBe(-32601);
   });
 
@@ -165,17 +203,22 @@ describe("POST /api/touba-infos/mcp — protocole et outils", () => {
     ["alaUne", { alaUne: true }],
     ["publier", { publier: true }],
   ])("refuse le champ « %s » (validation stricte)", async (_label, extra) => {
-    const { json } = await call("creer_brouillon", { ...VALID_DRAFT, ...extra });
+    const { json } = await call("creer_brouillon", {
+      ...VALID_DRAFT,
+      ...extra,
+    });
     expect(json.result.isError).toBe(true);
     expect(store.current!.articles).toHaveLength(2);
   });
 
   it("exige le statut de vérification et une rubrique du site", async () => {
     const { statut_verification: _omit, ...sansStatut } = VALID_DRAFT;
-    expect((await call("creer_brouillon", sansStatut)).json.result.isError).toBe(true);
     expect(
-      (await call("creer_brouillon", { ...VALID_DRAFT, categorie: "Inventée" })).json.result
-        .isError,
+      (await call("creer_brouillon", sansStatut)).json.result.isError,
+    ).toBe(true);
+    expect(
+      (await call("creer_brouillon", { ...VALID_DRAFT, categorie: "Inventée" }))
+        .json.result.isError,
     ).toBe(true);
   });
 
@@ -201,19 +244,75 @@ describe("POST /api/touba-infos/mcp — protocole et outils", () => {
   it("liste les brouillons de Claude uniquement par défaut", async () => {
     await call("creer_brouillon", VALID_DRAFT);
     store.current!.articles.push(
-      article({ id: "50", statut: "brouillon", metadata: { generatedBy: "amy-ia-solutions" } }),
+      article({
+        id: "50",
+        statut: "brouillon",
+        metadata: { generatedBy: "amy-ia-solutions" },
+      }),
     );
     const own = await call("lister_brouillons", {});
     expect(own.payload.total).toBe(1);
-    const all = await call("lister_brouillons", { origine: "toutes" });
+    const all = await call("lister_brouillons", { origine: "ia" });
     expect(all.payload.total).toBe(2);
   });
 
   it("lit un article publié ou un brouillon, pas un article programmé", async () => {
-    expect((await call("lire_article", { slug: "article-publie" })).payload.id).toBe("1");
-    const programmed = await call("lire_article", { slug: "article-programme" });
+    expect(
+      (await call("lire_article", { slug: "article-publie" })).payload.id,
+    ).toBe("1");
+    const programmed = await call("lire_article", {
+      slug: "article-programme",
+    });
     expect(programmed.json.result.isError).toBe(true);
-    const both = await call("lire_article", { id: "1", slug: "article-publie" });
+    const both = await call("lire_article", {
+      id: "1",
+      slug: "article-publie",
+    });
     expect(both.json.result.isError).toBe(true);
+  });
+
+  it("ne montre jamais les brouillons de la rédaction", async () => {
+    store.current!.articles.push(
+      article({ id: "60", statut: "brouillon", slug: "brouillon-redaction" }),
+    );
+    const list = await call("lister_brouillons", { origine: "ia" });
+    expect(
+      list.payload.brouillons.map((b: { id: string }) => b.id),
+    ).not.toContain("60");
+    const read = await call("lire_article", { slug: "brouillon-redaction" });
+    expect(read.json.result.isError).toBe(true);
+  });
+
+  it("retire les chevrons des champs hors contenu (titre, tags…)", async () => {
+    const { payload } = await call("creer_brouillon", {
+      ...VALID_DRAFT,
+      titre: "Titre </script><script>alert(1)</script> piégé",
+      tags: ["<b>tag</b>"],
+    });
+    const created = store.current!.articles.find((a) => a.id === payload.id)!;
+    expect(created.titre).not.toMatch(/[<>]/);
+    expect(created.tags.join(" ")).not.toMatch(/[<>]/);
+  });
+
+  it("refuse une origine navigateur étrangère", async () => {
+    const req = rpc({ jsonrpc: "2.0", id: 1, method: "ping" });
+    const res = await POST(
+      new Request(req, {
+        headers: {
+          ...Object.fromEntries(req.headers),
+          origin: "https://evil.example",
+        },
+      }),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("refuse un identifiant null et ignore les réponses JSON-RPC", async () => {
+    const nullId = await POST(
+      rpc({ jsonrpc: "2.0", id: null, method: "ping" }),
+    );
+    expect((await nullId.json()).error.code).toBe(-32600);
+    const response = await POST(rpc({ jsonrpc: "2.0", id: 9, result: {} }));
+    expect(response.status).toBe(202);
   });
 });

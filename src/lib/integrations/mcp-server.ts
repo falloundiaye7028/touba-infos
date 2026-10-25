@@ -47,7 +47,25 @@ type ToolName = (typeof TOOL_NAMES)[number];
 export const CREATE_LIMIT_PER_HOUR = 30;
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_CONTENT_RETURNED = 20_000;
-const READABLE_STATUSES = new Set(["brouillon", "publie"]);
+
+/** Brouillon préparé par une intégration IA (Claude ou AMY). */
+function isIntegrationDraft(a: ArticleInfo): boolean {
+  const origin = a.metadata?.generatedBy;
+  return (
+    (a.statut ?? "publie") === "brouillon" &&
+    typeof origin === "string" &&
+    (origin === "claude-mcp" || origin.startsWith("amy-ia"))
+  );
+}
+
+/**
+ * Moindre privilège en lecture : articles publiés, et brouillons préparés
+ * par les intégrations. Les brouillons de la rédaction et les articles
+ * programmés (embargo) restent invisibles pour le connecteur.
+ */
+function isReadable(a: ArticleInfo): boolean {
+  return (a.statut ?? "publie") === "publie" || isIntegrationDraft(a);
+}
 
 const SERVER_INSTRUCTIONS =
   "Connecteur de la rédaction de Touba Infos. Il permet seulement de créer " +
@@ -103,15 +121,27 @@ const createDraftArgs = z
 
 const listDraftsArgs = z
   .object({
-    origine: z.enum(["claude", "toutes"]).default("claude"),
+    origine: z.enum(["claude", "ia"]).default("claude"),
     limite: z.number().int().min(1).max(50).default(20),
   })
   .strict();
 
 const readArticleArgs = z
   .object({
-    id: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9_-]+$/).optional(),
-    slug: z.string().trim().min(1).max(120).regex(/^[a-z0-9-]+$/).optional(),
+    id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(40)
+      .regex(/^[A-Za-z0-9_-]+$/)
+      .optional(),
+    slug: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .regex(/^[a-z0-9-]+$/)
+      .optional(),
   })
   .strict()
   .refine((v) => Boolean(v.id) !== Boolean(v.slug), {
@@ -138,7 +168,10 @@ const TOOLS = [
         titre: { type: "string", minLength: 5, maxLength: 200 },
         contenu: { type: "string", minLength: 30, maxLength: 50_000 },
         categorie: { type: "string", enum: [...INTEGRATION_CATEGORIES] },
-        statut_verification: { type: "string", enum: [...VERIFICATION_STATUSES] },
+        statut_verification: {
+          type: "string",
+          enum: [...VERIFICATION_STATUSES],
+        },
         genre: { type: "string", enum: [...INTEGRATION_GENRES] },
         sous_titre: { type: "string", maxLength: 300 },
         extrait: { type: "string", maxLength: 500 },
@@ -187,13 +220,15 @@ const TOOLS = [
     name: "lister_brouillons",
     title: "Lister les brouillons",
     description:
-      "Liste les brouillons en attente de validation, les plus récents d'abord. " +
-      "Par défaut, seulement ceux préparés par Claude.",
+      "Liste les brouillons préparés par les intégrations IA, en attente de " +
+      "validation, les plus récents d'abord. « claude » (défaut) : ceux de " +
+      "Claude ; « ia » : ceux de Claude et d'AMY IA. Les brouillons écrits " +
+      "par la rédaction ne sont pas visibles.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
-        origine: { type: "string", enum: ["claude", "toutes"], default: "claude" },
+        origine: { type: "string", enum: ["claude", "ia"], default: "claude" },
         limite: { type: "integer", minimum: 1, maximum: 50, default: 20 },
       },
     },
@@ -208,7 +243,8 @@ const TOOLS = [
     name: "lire_article",
     title: "Lire un article",
     description:
-      "Lit un brouillon ou un article publié, par « id » ou par « slug ».",
+      "Lit un article publié, ou un brouillon préparé par une intégration IA, " +
+      "par « id » ou par « slug ».",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -283,16 +319,24 @@ export interface McpLogEntry {
 }
 
 // ── Outils ──────────────────────────────────────────────────────────────────
-async function callCreateDraft(args: unknown, ctx: McpContext, log: McpLogEntry) {
+async function callCreateDraft(
+  args: unknown,
+  ctx: McpContext,
+  log: McpLogEntry,
+) {
   const parsed = createDraftArgs.safeParse(args ?? {});
   if (!parsed.success) {
     log.outcome = "refused";
     return toolText({ erreur: zodMessage(parsed.error) }, true);
   }
-  if (!rateLimit("mcp:creer_brouillon", CREATE_LIMIT_PER_HOUR, HOUR_MS).allowed) {
+  if (
+    !rateLimit("mcp:creer_brouillon", CREATE_LIMIT_PER_HOUR, HOUR_MS).allowed
+  ) {
     log.outcome = "refused";
     return toolText(
-      { erreur: `Limite atteinte : ${CREATE_LIMIT_PER_HOUR} brouillons par heure.` },
+      {
+        erreur: `Limite atteinte : ${CREATE_LIMIT_PER_HOUR} brouillons par heure.`,
+      },
       true,
     );
   }
@@ -358,8 +402,8 @@ async function callListDrafts(args: unknown, log: McpLogEntry) {
   }
   const { origine, limite } = parsed.data;
   const drafts = (await adminListAll())
-    .filter((a) => (a.statut ?? "publie") === "brouillon")
-    .filter((a) => origine === "toutes" || a.metadata?.generatedBy === "claude-mcp")
+    .filter(isIntegrationDraft)
+    .filter((a) => origine === "ia" || a.metadata?.generatedBy === "claude-mcp")
     .slice(0, limite)
     .map(summarizeArticle);
 
@@ -395,9 +439,12 @@ async function callReadArticle(args: unknown, log: McpLogEntry) {
   const article = (await adminListAll()).find((a) =>
     id ? a.id === id : a.slug === slug,
   );
-  if (!article || !READABLE_STATUSES.has(article.statut ?? "publie")) {
+  if (!article || !isReadable(article)) {
     log.outcome = "refused";
-    return toolText({ erreur: "Article introuvable ou non consultable." }, true);
+    return toolText(
+      { erreur: "Article introuvable ou non consultable." },
+      true,
+    );
   }
   log.articleId = article.id;
   return toolText(readableArticle(article));
@@ -415,7 +462,10 @@ function negotiateVersion(requested: unknown): string {
 }
 
 function isToolName(value: unknown): value is ToolName {
-  return typeof value === "string" && (TOOL_NAMES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" &&
+    (TOOL_NAMES as readonly string[]).includes(value)
+  );
 }
 
 /**
@@ -429,13 +479,36 @@ export async function handleMcpMessage(
 ): Promise<JsonRpcResponse | null> {
   if (!message || typeof message !== "object" || Array.isArray(message)) {
     log.outcome = "refused";
-    return rpcError(null, RPC_ERRORS.invalidRequest, "Requête JSON-RPC invalide.");
+    return rpcError(
+      null,
+      RPC_ERRORS.invalidRequest,
+      "Requête JSON-RPC invalide.",
+    );
   }
   const msg = message as Record<string, unknown>;
   const method = typeof msg.method === "string" ? msg.method : "";
   log.method = method || "?";
 
   const hasId = typeof msg.id === "string" || typeof msg.id === "number";
+
+  // Réponse JSON-RPC envoyée par le client (pas de méthode) : rien à répondre.
+  if (
+    msg.jsonrpc === "2.0" &&
+    !method &&
+    hasId &&
+    ("result" in msg || "error" in msg)
+  ) {
+    return null;
+  }
+  // MCP interdit un identifiant null.
+  if ("id" in msg && msg.id === null) {
+    log.outcome = "refused";
+    return rpcError(
+      null,
+      RPC_ERRORS.invalidRequest,
+      "Identifiant de requête invalide.",
+    );
+  }
   if (msg.jsonrpc !== "2.0" || !method) {
     log.outcome = "refused";
     return rpcError(
@@ -475,14 +548,32 @@ export async function handleMcpMessage(
           return ok(id, await callListDrafts(params.arguments, log));
         }
         return ok(id, await callReadArticle(params.arguments, log));
-      } catch {
+      } catch (error) {
         log.outcome = "error";
-        return ok(id, toolText({ erreur: "Erreur interne. Aucune donnée n'a été publiée." }, true));
+        console.error("[mcp] erreur d'outil", {
+          requestId: ctx.requestId,
+          tool: name,
+          error:
+            error instanceof Error
+              ? `${error.name}: ${error.message}`
+              : "inconnue",
+        });
+        return ok(
+          id,
+          toolText(
+            { erreur: "Erreur interne. Aucune donnée n'a été publiée." },
+            true,
+          ),
+        );
       }
     }
     default:
       log.outcome = "refused";
-      return rpcError(id, RPC_ERRORS.methodNotFound, "Méthode non prise en charge.");
+      return rpcError(
+        id,
+        RPC_ERRORS.methodNotFound,
+        "Méthode non prise en charge.",
+      );
   }
 }
 

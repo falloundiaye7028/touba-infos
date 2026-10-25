@@ -1,14 +1,17 @@
 // ============================================================================
 //  TOUBA INFOS — Images reçues des intégrations
 //  Règle : seule une image déjà stockée dans le stockage Vercel Blob de
-//  Touba Infos (dossier touba-infos/) peut devenir l'image d'un article.
+//  Touba Infos (dossier touba-infos/articles/, format image) peut devenir
+//  l'image d'un article. Les autres dossiers du stockage (ebooks payants…)
+//  sont exclus.
 //  Toute autre adresse (photo d'un autre média, banque d'images, autre
 //  stockage Vercel…) n'est JAMAIS utilisée automatiquement : elle est
 //  seulement conservée en suggestion, pour décision humaine dans /admin.
 // ============================================================================
 
 const BLOB_DOMAIN = "public.blob.vercel-storage.com";
-const OWN_PATH_PREFIX = "/touba-infos/";
+const OWN_PATH_PREFIX = "/touba-infos/articles/";
+const IMAGE_EXTENSION = /\.(jpe?g|png|webp|gif|avif)$/i;
 
 /**
  * Hôte public du stockage Blob de Touba Infos.
@@ -51,14 +54,19 @@ export function resolveIntegrationImage(
   }
 
   const host = ownBlobHost(env);
+  const path = url.pathname;
   const isOwn =
     host !== null &&
     url.protocol === "https:" &&
     url.hostname.toLowerCase() === host &&
+    url.port === "" &&
     url.username === "" &&
     url.password === "" &&
-    url.pathname.startsWith(OWN_PATH_PREFIX);
+    path.startsWith(OWN_PATH_PREFIX) &&
+    !/%2f|%2e|%5c|\\|\/\.\.?\//i.test(path) &&
+    IMAGE_EXTENSION.test(path);
 
-  if (isOwn) return { imageUrl: url.toString() };
+  // Adresse reconstruite sans requête ni fragment.
+  if (isOwn) return { imageUrl: `https://${host}${path}` };
   return { suggestion: url.toString() };
 }

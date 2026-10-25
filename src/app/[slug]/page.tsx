@@ -18,6 +18,7 @@ import {
   SectionHeading,
 } from "../_components/ui";
 import ShareButtons from "../_components/ShareButtons";
+import { safeJsonLd } from "@/lib/json-ld";
 
 const SITE = MEDIA_URL;
 
@@ -280,11 +281,11 @@ export default async function ArticlePage({
 
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }}
       />
     </article>
   );

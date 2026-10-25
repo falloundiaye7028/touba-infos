@@ -15,7 +15,9 @@ export function createFakeStore(initial: ArticleInfo[] = []) {
     adminListAll: async () =>
       articles
         .slice()
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        .sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        ),
     adminCreate: async (input: CreateInput): Promise<ArticleInfo> => {
       const id = String(
         articles.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1,
@@ -51,7 +53,9 @@ export function createFakeStore(initial: ArticleInfo[] = []) {
   };
 }
 
-export function article(partial: Partial<ArticleInfo> & { id: string }): ArticleInfo {
+export function article(
+  partial: Partial<ArticleInfo> & { id: string },
+): ArticleInfo {
   return {
     slug: `slug-${partial.id}`,
     titre: `Titre ${partial.id}`,

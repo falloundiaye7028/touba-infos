@@ -50,18 +50,23 @@ function source(file: string): string {
 }
 
 describe("audit des permissions des intégrations", () => {
-  it.each(INTEGRATION_FILES)("%s n'utilise aucune opération interdite", (file) => {
-    const code = source(file);
-    for (const word of FORBIDDEN) {
-      expect(code, `${file} contient « ${word} »`).not.toContain(word);
-    }
-  });
+  it.each(INTEGRATION_FILES)(
+    "%s n'utilise aucune opération interdite",
+    (file) => {
+      const code = source(file);
+      for (const word of FORBIDDEN) {
+        expect(code, `${file} contient « ${word} »`).not.toContain(word);
+      }
+    },
+  );
 
   it("seul draft-service importe une fonction d'écriture : adminCreate", () => {
     for (const file of INTEGRATION_FILES) {
       const code = source(file);
       if (file.endsWith("draft-service.ts")) {
-        expect(code).toMatch(/import \{ adminCreate, adminListAll \} from "@\/lib\/touba-infos-store"/);
+        expect(code).toMatch(
+          /import \{ adminCreate, adminListAll \} from "@\/lib\/touba-infos-store"/,
+        );
       } else {
         expect(code, file).not.toContain("adminCreate");
       }
@@ -76,23 +81,37 @@ describe("audit des permissions des intégrations", () => {
 
   it("aucun outil exposé ne publie, ne modifie ni ne supprime", () => {
     const names = exposedTools().map((t) => t.name);
-    expect(names).toEqual(["creer_brouillon", "lister_brouillons", "lire_article"]);
+    expect(names).toEqual([
+      "creer_brouillon",
+      "lister_brouillons",
+      "lire_article",
+    ]);
     for (const name of names) {
-      expect(name).not.toMatch(/publi|modif|update|supprim|delete|statut|archiv/i);
+      expect(name).not.toMatch(
+        /publi|modif|update|supprim|delete|statut|archiv/i,
+      );
     }
   });
 
   it("les routes d'intégration n'exposent que POST pour écrire", () => {
-    const incoming = source("src/app/api/touba-infos/integrations/incoming/route.ts");
-    expect(incoming).not.toMatch(/export (async )?function (PUT|PATCH|DELETE|GET)/);
+    const incoming = source(
+      "src/app/api/touba-infos/integrations/incoming/route.ts",
+    );
+    expect(incoming).not.toMatch(
+      /export (async )?function (PUT|PATCH|DELETE|GET)/,
+    );
     const mcp = source("src/app/api/touba-infos/mcp/route.ts");
-    expect(mcp).toMatch(/export const (GET|DELETE|PUT|PATCH) = methodNotAllowed/);
+    expect(mcp).toMatch(
+      /export const (GET|DELETE|PUT|PATCH) = methodNotAllowed/,
+    );
   });
 
   it("aucun secret en clair dans les fichiers d'intégration", () => {
     for (const file of INTEGRATION_FILES) {
       const code = readFileSync(path.join(ROOT, file), "utf8");
-      expect(code, file).not.toMatch(/(sk-ant-|sk-[A-Za-z0-9]{20,}|vercel_blob_rw_[A-Za-z0-9]+_[A-Za-z0-9]{10,})/);
+      expect(code, file).not.toMatch(
+        /(sk-ant-|sk-[A-Za-z0-9]{20,}|vercel_blob_rw_[A-Za-z0-9]+_[A-Za-z0-9]{10,})/,
+      );
     }
   });
 });

@@ -1,13 +1,13 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 /** Longueur minimale d'un secret d'intégration accepté. */
 export const MIN_SECRET_LENGTH = 32;
 
+/** Compare les empreintes SHA-256 : temps constant, longueur non révélée. */
 function safeEqual(a: string, b: string): boolean {
-  const bufferA = Buffer.from(a);
-  const bufferB = Buffer.from(b);
-  if (bufferA.length !== bufferB.length) return false;
-  return timingSafeEqual(bufferA, bufferB);
+  const digestA = createHash("sha256").update(a).digest();
+  const digestB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(digestA, digestB);
 }
 
 /**
@@ -21,10 +21,10 @@ export function verifyBearer(
 ): boolean {
   if (!secret || secret.length < minLength) return false;
 
-  const header = authorizationHeader ?? "";
-  if (!header.startsWith("Bearer ")) return false;
+  const match = /^bearer\s+(.+)$/i.exec((authorizationHeader ?? "").trim());
+  if (!match) return false;
 
-  const token = header.slice("Bearer ".length).trim();
+  const token = match[1].trim();
   if (!token) return false;
 
   return safeEqual(token, secret);

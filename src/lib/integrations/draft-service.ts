@@ -77,7 +77,9 @@ export function normalizeTitle(titre: string): string {
 
 export function computeDedupeKey(titre: string, sourceUrl?: string): string {
   return createHash("sha256")
-    .update(`${normalizeTitle(titre)}|${(sourceUrl ?? "").trim().toLowerCase()}`)
+    .update(
+      `${normalizeTitle(titre)}|${(sourceUrl ?? "").trim().toLowerCase()}`,
+    )
     .digest("hex");
 }
 
@@ -86,34 +88,59 @@ function metaString(a: ArticleInfo, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/** Recherche un brouillon déjà créé pour la même demande. */
+/**
+ * Recherche un brouillon déjà créé pour la même demande.
+ * Ne considère QUE les brouillons créés par la même intégration : un article
+ * publié, programmé ou écrit par la rédaction n'est jamais renvoyé.
+ */
 export function findDuplicate(
   existing: ArticleInfo[],
-  request: Pick<DraftRequest, "origin" | "titre" | "sourceUrl" | "idempotencyKey">,
+  request: Pick<
+    DraftRequest,
+    "origin" | "titre" | "sourceUrl" | "idempotencyKey"
+  >,
   now: Date,
 ): ArticleInfo | undefined {
   const dedupeKey = computeDedupeKey(request.titre, request.sourceUrl);
   const title = normalizeTitle(request.titre);
+  const source = request.sourceUrl?.trim().toLowerCase();
 
   return existing.find((a) => {
+    const sameOriginDraft =
+      (a.statut ?? "publie") === "brouillon" &&
+      metaString(a, "generatedBy") === request.origin;
+    if (!sameOriginDraft) return false;
+
     if (
       request.idempotencyKey &&
-      metaString(a, "idempotencyKey") === request.idempotencyKey &&
-      metaString(a, "generatedBy") === request.origin
+      metaString(a, "idempotencyKey") === request.idempotencyKey
     ) {
       return true;
     }
     if (metaString(a, "dedupeKey") === dedupeKey) return true;
 
-    const isDraft = (a.statut ?? "publie") === "brouillon";
+    // Même titre sous 72 h, sauf si les deux demandes citent des sources
+    // différentes (ex. deux communiqués distincts au titre générique).
+    const otherSource = metaString(a, "sourceUrl")?.trim().toLowerCase();
+    if (source && otherSource && source !== otherSource) return false;
+
     const age = now.getTime() - new Date(a.date).getTime();
     return (
-      isDraft &&
       age >= 0 &&
       age <= DUPLICATE_TITLE_WINDOW_MS &&
       normalizeTitle(a.titre) === title
     );
   });
+}
+
+/**
+ * Champ texte affiché hors du corps de l'article (titre, chapô, tags,
+ * légende, crédit) : retire les chevrons pour qu'aucun de ces champs ne
+ * puisse contenir de balise, quel que soit l'endroit où il est rendu.
+ */
+export function plainField(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return value.replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
 }
 
 export class DraftInvariantError extends Error {}
@@ -122,6 +149,9 @@ export async function createIntegrationDraft(
   request: DraftRequest,
   now: Date = new Date(),
 ): Promise<DraftResult> {
+  if (!plainField(request.titre)) {
+    throw new DraftInvariantError("Titre vide après nettoyage.");
+  }
   const existing = await adminListAll();
   const duplicate = findDuplicate(existing, request, now);
   if (duplicate) return { article: duplicate, duplicate: true };
@@ -136,17 +166,19 @@ export async function createIntegrationDraft(
     : undefined;
 
   const article = await adminCreate({
-    titre: request.titre.trim(),
-    sousTitre: request.sousTitre?.trim() ?? "",
-    extrait: request.extrait?.trim() ?? "",
+    titre: plainField(request.titre) ?? "",
+    sousTitre: plainField(request.sousTitre) ?? "",
+    extrait: plainField(request.extrait) ?? "",
     categorie: request.categorie,
     genre: request.genre ?? "Actualité",
     auteur: INTEGRATION_AUTHOR,
     contenu: request.contenuHtml,
-    tags: request.tags ?? [],
+    tags: (request.tags ?? [])
+      .map((tag) => plainField(tag) ?? "")
+      .filter(Boolean),
     imageUrl: image.imageUrl,
-    credit: image.imageUrl ? request.credit : undefined,
-    legende: image.imageUrl ? request.legende : undefined,
+    credit: image.imageUrl ? plainField(request.credit) : undefined,
+    legende: image.imageUrl ? plainField(request.legende) : undefined,
     date: now.toISOString(),
     // ── Invariants : jamais modifiables par l'appelant ──
     statut: "brouillon",
@@ -169,7 +201,9 @@ export async function createIntegrationDraft(
       socialPosts:
         socialPosts && Object.keys(socialPosts).length ? socialPosts : null,
       imageSuggestion: image.suggestion ?? null,
-      imageCreditSuggestion: image.suggestion ? request.credit ?? null : null,
+      imageCreditSuggestion: image.suggestion
+        ? (plainField(request.credit) ?? null)
+        : null,
     },
   });
 

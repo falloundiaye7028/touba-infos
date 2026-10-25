@@ -21,7 +21,15 @@ import { rateLimit } from "@/lib/rateLimit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_BODY_CHARS = 200_000;
+const MAX_BODY_BYTES = 256 * 1024;
+
+/**
+ * Origines navigateur acceptées. Les appels de Claude sont faits depuis ses
+ * serveurs (sans en-tête Origin). Un en-tête Origin d'un autre site signale
+ * une requête de navigateur : elle est refusée (protection DNS rebinding /
+ * requêtes intersites, exigée par la spécification MCP Streamable HTTP).
+ */
+const ALLOWED_ORIGINS = new Set(["https://claude.ai", "https://claude.com"]);
 /** Appels autorisés par heure, tous outils confondus (par instance). */
 const CALLS_PER_HOUR = 300;
 const HOUR_MS = 60 * 60 * 1000;
@@ -38,11 +46,21 @@ function jsonError(status: number, message: string, extra?: HeadersInit) {
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
-  if (!isMcpConfigured()) {
-    return jsonError(503, "Connecteur non configuré.");
+  const origin = request.headers.get("origin");
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    return jsonError(403, "Origine non autorisée.");
   }
-  if (!verifyMcpToken(request.headers.get("authorization"))) {
-    console.warn("[mcp] accès refusé", { requestId });
+
+  // Même réponse (401) que le connecteur soit désactivé ou le jeton faux :
+  // un tiers ne peut pas savoir si le connecteur est configuré.
+  if (
+    !isMcpConfigured() ||
+    !verifyMcpToken(request.headers.get("authorization"))
+  ) {
+    console.warn("[mcp] accès refusé", {
+      requestId,
+      reason: isMcpConfigured() ? "jeton invalide" : "connecteur non configuré",
+    });
     return jsonError(401, "Non autorisé.");
   }
   if (!rateLimit("mcp:calls", CALLS_PER_HOUR, HOUR_MS).allowed) {
@@ -54,8 +72,12 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(415, "Content-Type application/json requis.");
   }
 
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return jsonError(413, "Requête trop volumineuse.");
+  }
   const raw = await request.text();
-  if (raw.length > MAX_BODY_CHARS) {
+  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) {
     return jsonError(413, "Requête trop volumineuse.");
   }
 
@@ -63,14 +85,21 @@ export async function POST(request: Request): Promise<Response> {
   try {
     message = JSON.parse(raw);
   } catch {
-    return NextResponse.json(rpcError(null, RPC_ERRORS.parse, "JSON invalide."), {
-      status: 400,
-      headers: NO_STORE,
-    });
+    return NextResponse.json(
+      rpcError(null, RPC_ERRORS.parse, "JSON invalide."),
+      {
+        status: 400,
+        headers: NO_STORE,
+      },
+    );
   }
   if (Array.isArray(message)) {
     return NextResponse.json(
-      rpcError(null, RPC_ERRORS.invalidRequest, "Les lots JSON-RPC ne sont pas acceptés."),
+      rpcError(
+        null,
+        RPC_ERRORS.invalidRequest,
+        "Les lots JSON-RPC ne sont pas acceptés.",
+      ),
       { status: 400, headers: NO_STORE },
     );
   }

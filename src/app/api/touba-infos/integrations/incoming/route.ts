@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 const RATE_LIMIT_MAX = 100;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
-const MAX_BODY_CHARS = 250_000;
+const MAX_BODY_BYTES = 512 * 1024;
 
 // Ce point d'entrée ne fait qu'UNE chose : créer un brouillon.
 // Aucune méthode GET/PUT/PATCH/DELETE n'est exportée ; Next.js répond 405.
@@ -27,15 +27,25 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  if (!rateLimit("amy-incoming", RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS).allowed) {
+  if (
+    !rateLimit("amy-incoming", RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS).allowed
+  ) {
     return NextResponse.json(
       { ok: false, error: "Limite de débit atteinte (100 req/h)." },
       { status: 429 },
     );
   }
 
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return NextResponse.json(
+      { ok: false, error: "Payload trop volumineux." },
+      { status: 413 },
+    );
+  }
+
   const raw = await request.text();
-  if (raw.length > MAX_BODY_CHARS) {
+  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) {
     return NextResponse.json(
       { ok: false, error: "Payload trop volumineux." },
       { status: 413 },
@@ -69,18 +79,32 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const { article, duplicate } = await createIntegrationDraft({
-    origin: "amy-ia-solutions",
-    titre: input.title,
-    contenuHtml,
-    categorie: input.categorie,
-    extrait: input.meta?.description,
-    tags: input.meta?.keywords,
-    imageUrl: input.imageUrl,
-    sourceUrl: input.sourceUrl,
-    socialPosts: input.socialPosts,
-    requestId,
-  });
+  let result;
+  try {
+    result = await createIntegrationDraft({
+      origin: "amy-ia-solutions",
+      titre: input.title,
+      contenuHtml,
+      categorie: input.categorie,
+      extrait: input.meta?.description,
+      tags: input.meta?.keywords,
+      imageUrl: input.imageUrl,
+      sourceUrl: input.sourceUrl,
+      socialPosts: input.socialPosts,
+      requestId,
+    });
+  } catch (error) {
+    console.error("[amy-incoming] échec de création", {
+      requestId,
+      error:
+        error instanceof Error ? `${error.name}: ${error.message}` : "inconnue",
+    });
+    return NextResponse.json(
+      { ok: false, error: "Création du brouillon impossible." },
+      { status: 500 },
+    );
+  }
+  const { article, duplicate } = result;
 
   console.info("[amy-incoming] brouillon", {
     requestId,
@@ -95,6 +119,7 @@ export async function POST(request: Request): Promise<Response> {
       draftUrl: `/admin/articles/${article.id}`,
       duplicate,
     },
-    { status: duplicate ? 200 : 201 },
+    // 201 dans tous les cas : contrat existant d'AMY préservé.
+    { status: 201 },
   );
 }

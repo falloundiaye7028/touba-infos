@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { article, createFakeStore } from "./fake-store";
 
-const store = vi.hoisted(() => ({ current: null as ReturnType<typeof createFakeStore> | null }));
+const store = vi.hoisted(() => ({
+  current: null as ReturnType<typeof createFakeStore> | null,
+}));
 
 vi.mock("@/lib/touba-infos-store", () => ({
   adminListAll: () => store.current!.adminListAll(),
@@ -34,7 +36,12 @@ describe("createIntegrationDraft", () => {
   });
 
   it("crée toujours un brouillon, jamais à la une ni breaking", async () => {
-    const forged = { ...request(), statut: "publie", alaUne: true, breaking: true };
+    const forged = {
+      ...request(),
+      statut: "publie",
+      alaUne: true,
+      breaking: true,
+    };
     const { article: a, duplicate } = await createIntegrationDraft(
       forged as DraftRequest,
       NOW,
@@ -99,7 +106,10 @@ describe("createIntegrationDraft", () => {
       NOW,
     );
     const second = await createIntegrationDraft(
-      request({ titre: "Autre titre complètement différent", idempotencyKey: "cle-unique-001" }),
+      request({
+        titre: "Autre titre complètement différent",
+        idempotencyKey: "cle-unique-001",
+      }),
       NOW,
     );
     expect(second.duplicate).toBe(true);
@@ -127,7 +137,11 @@ describe("createIntegrationDraft", () => {
 
   it("une clé d'idempotence d'une autre origine ne bloque pas", async () => {
     await createIntegrationDraft(
-      request({ origin: "amy-ia-solutions", idempotencyKey: "cle-partagee-1", titre: "Sujet A de test" }),
+      request({
+        origin: "amy-ia-solutions",
+        idempotencyKey: "cle-partagee-1",
+        titre: "Sujet A de test",
+      }),
       NOW,
     );
     const r = await createIntegrationDraft(
@@ -146,5 +160,48 @@ describe("createIntegrationDraft", () => {
     await expect(createIntegrationDraft(request(), NOW)).rejects.toThrow(
       /non-publication/,
     );
+  });
+
+  it("ne renvoie jamais un article publié comme doublon", async () => {
+    store.current!.articles.push(
+      article({
+        id: "20",
+        statut: "publie",
+        titre: "Touba : réunion des cadres sur la salubrité",
+        metadata: {
+          generatedBy: "claude-mcp",
+          dedupeKey: computeDedupeKey(
+            "Touba : réunion des cadres sur la salubrité",
+          ),
+        },
+      }),
+    );
+    const r = await createIntegrationDraft(request(), NOW);
+    expect(r.duplicate).toBe(false);
+    expect(r.article.statut).toBe("brouillon");
+  });
+
+  it("ne considère pas le brouillon d'une autre origine comme doublon", async () => {
+    await createIntegrationDraft(request({ origin: "amy-ia-solutions" }), NOW);
+    const r = await createIntegrationDraft(request(), NOW);
+    expect(r.duplicate).toBe(false);
+  });
+
+  it("même titre mais sources différentes : pas un doublon", async () => {
+    await createIntegrationDraft(
+      request({ titre: "Communiqué", sourceUrl: "https://a.sn/1" }),
+      NOW,
+    );
+    const r = await createIntegrationDraft(
+      request({ titre: "Communiqué", sourceUrl: "https://b.sn/2" }),
+      NOW,
+    );
+    expect(r.duplicate).toBe(false);
+  });
+
+  it("refuse un titre vide après nettoyage", async () => {
+    await expect(
+      createIntegrationDraft(request({ titre: "<<>>" }), NOW),
+    ).rejects.toThrow(/Titre vide/);
   });
 });

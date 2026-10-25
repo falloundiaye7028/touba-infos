@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createFakeStore } from "@/lib/integrations/__tests__/fake-store";
 
-const store = vi.hoisted(() => ({ current: null as ReturnType<typeof createFakeStore> | null }));
+const store = vi.hoisted(() => ({
+  current: null as ReturnType<typeof createFakeStore> | null,
+}));
 const limits = vi.hoisted(() => ({ blocked: new Set<string>() }));
 
 vi.mock("@/lib/touba-infos-store", () => ({
@@ -24,7 +26,10 @@ const SECRET = "k".repeat(40);
 function rpc(body: unknown) {
   return new Request("https://toubainfos.com/api/touba-infos/mcp", {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${SECRET}` },
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${SECRET}`,
+    },
     body: JSON.stringify(body),
   });
 }
@@ -54,7 +59,8 @@ describe("limites de débit du connecteur", () => {
           name: "creer_brouillon",
           arguments: {
             titre: "Un titre de test valide",
-            contenu: "Un contenu de test suffisamment long pour passer la validation.",
+            contenu:
+              "Un contenu de test suffisamment long pour passer la validation.",
             categorie: "Touba",
             statut_verification: "À VÉRIFIER",
           },
