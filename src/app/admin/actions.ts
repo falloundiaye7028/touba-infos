@@ -7,27 +7,33 @@ import * as store from "@/lib/touba-infos-store";
 import { TI_COOKIE, isAuthed } from "@/lib/touba-infos-admin";
 import {
   createSessionToken,
+  isWeakPassword,
   resolveAdminPassword,
   sessionCookieOptions,
   sessionKey,
   verifyAdminPassword,
 } from "@/lib/admin-session";
 import { rateLimit } from "@/lib/rateLimit";
-import type {
-  CategorieInfo,
-  GenreInfo,
-  StatutInfo,
-} from "@/lib/touba-infos";
+import type { CategorieInfo, GenreInfo, StatutInfo } from "@/lib/touba-infos";
 
 const LOGIN_ATTEMPTS = 10;
+const LOGIN_ATTEMPTS_GLOBAL = 100;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 export async function loginAction(formData: FormData) {
+  // Sur Vercel, x-vercel-forwarded-for et x-real-ip sont posés par la
+  // plateforme ; x-forwarded-for ne sert qu'en dernier recours.
+  const h = await headers();
   const ip =
-    (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip")?.trim() ||
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     "inconnue";
-  if (!rateLimit(`admin-login:${ip}`, LOGIN_ATTEMPTS, LOGIN_WINDOW_MS).allowed) {
+  if (
+    !rateLimit(`admin-login:${ip}`, LOGIN_ATTEMPTS, LOGIN_WINDOW_MS).allowed ||
+    !rateLimit("admin-login:*", LOGIN_ATTEMPTS_GLOBAL, LOGIN_WINDOW_MS).allowed
+  ) {
     redirect("/admin?error=limit");
   }
 
@@ -43,6 +49,12 @@ export async function loginAction(formData: FormData) {
   const pw = String(formData.get("password") ?? "");
   if (!verifyAdminPassword(pw, expected)) {
     redirect("/admin?error=auth");
+  }
+
+  if (isWeakPassword(expected)) {
+    console.warn(
+      "[admin] TI_ADMIN_PASSWORD est court : 12 caractères ou plus recommandés.",
+    );
   }
 
   const jar = await cookies();
@@ -75,7 +87,9 @@ function parseTags(v: FormDataEntryValue | null): string[] {
 
 function focal(value: FormDataEntryValue | null): number {
   const number = Number(value);
-  return Number.isFinite(number) ? Math.min(100, Math.max(0, Math.round(number))) : 50;
+  return Number.isFinite(number)
+    ? Math.min(100, Math.max(0, Math.round(number)))
+    : 50;
 }
 
 function fromForm(formData: FormData) {
@@ -90,7 +104,9 @@ function fromForm(formData: FormData) {
     genre: String(formData.get("genre") ?? "Actualité") as GenreInfo,
     statut: String(formData.get("statut") ?? "brouillon") as StatutInfo,
     auteur: String(formData.get("auteur") ?? "").trim(),
-    date: dateLocal ? new Date(dateLocal).toISOString() : new Date().toISOString(),
+    date: dateLocal
+      ? new Date(dateLocal).toISOString()
+      : new Date().toISOString(),
     tempsLecture: String(formData.get("tempsLecture") ?? "3 min").trim(),
     imageUrl: String(formData.get("imageUrl") ?? "").trim() || undefined,
     imageFocalX: focal(formData.get("imageFocalX")),

@@ -43,7 +43,9 @@ Aucune de ces étapes n'a été faite : elles relèvent de l'administrateur du s
 1. **Générer un secret** d'au moins 32 caractères, par exemple : `openssl rand -hex 32`.
 2. **Vercel → Settings → Environment Variables** (environnement Production) :
    - `TOUBA_INFOS_MCP_SECRET` = le secret ;
-   - vérifier que `TI_ADMIN_PASSWORD` est défini (sinon la connexion à `/admin` est désormais refusée en production) ;
+   - **changer `TI_ADMIN_PASSWORD`** pour un nouveau mot de passe de 12 caractères ou plus : l'ancien système le stockait en clair dans le cookie des navigateurs connectés, il doit donc être considéré comme exposé. Sans cette variable, ou avec une valeur par défaut (`change-me`, `touba-infos`…), la connexion à `/admin` est refusée en production ;
+   - créer `TI_SESSION_SECRET` (`openssl rand -hex 32`), recommandé ;
+   - vérifier que `TOUBA_INFOS_INTEGRATION_SECRET` (AMY) fait au moins 32 caractères ; sinon, le régénérer et le mettre à jour aussi côté AMY ;
    - vérifier que `TI_AGENT_AUTOPUBLISH` est absent ou vaut `off` (variable héritée, sans effet sur les intégrations).
 3. **Redéployer** le site.
 4. **Ajouter le connecteur dans Claude** : Customize → Connectors → Add custom connector (ou Organization settings → Connectors sur Team/Enterprise) :
@@ -80,6 +82,19 @@ L'API ajoute elle-même le préfixe `Bearer`. Le connecteur MCP de l'API exige u
 - Une fuite du secret permet seulement de **créer des brouillons** et de **lire** les articles publiés et les brouillons IA. Elle ne permet ni de publier ni de supprimer.
 - Pour révoquer : changer `TOUBA_INFOS_MCP_SECRET` sur Vercel et redéployer. Dans Claude, les en-têtes ne sont pas modifiables : supprimer le connecteur et le rajouter avec la nouvelle valeur.
 - Supprimer la variable désactive totalement le connecteur (réponse 401).
+
+## Dépannage
+
+| Symptôme dans Claude | Cause probable |
+| --- | --- |
+| « Authorization with the MCP server failed » ou demande de connexion OAuth | En-tête `authorization` absent ou faux : le site répond 401 et Claude tente alors une découverte OAuth (`/.well-known/oauth-protected-resource`), qui n'existe pas. Vérifier la valeur `Bearer <secret>` (le connecteur doit être supprimé puis rajouté pour la changer). |
+| « Couldn't reach the MCP server » | Site indisponible, URL erronée, ou variable `TOUBA_INFOS_MCP_SECRET` absente ou trop courte après déploiement. |
+| Section « Request headers » absente | Fonctionnalité bêta non ouverte à votre compte (voir plus haut). |
+
+## Sessions de l'espace rédaction
+
+- Après déploiement, **tous les utilisateurs de `/admin` doivent se reconnecter une fois** (les anciens cookies sont refusés).
+- La déconnexion efface le cookie du navigateur, mais une copie volée du cookie reste valable jusqu'à son expiration (8 h). Pour couper **toutes** les sessions immédiatement : changer `TI_SESSION_SECRET` ou `TI_ADMIN_PASSWORD` et redéployer.
 
 ## Sécurité côté serveur
 

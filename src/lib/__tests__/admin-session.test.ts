@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEV_FALLBACK_PASSWORD,
+  isWeakPassword,
   SESSION_TTL_MS,
   createSessionToken,
   resolveAdminPassword,
@@ -95,5 +96,57 @@ describe("jeton de session", () => {
     const token = createSessionToken(withSecret, now);
     expect(verifySessionToken(token, withSecret, now + 1)).toBe(true);
     expect(verifySessionToken(token, key, now + 1)).toBe(false);
+  });
+
+  it("changer le mot de passe invalide les sessions même avec TI_SESSION_SECRET", () => {
+    const secret = "s".repeat(40);
+    const before = sessionKey({ ...PROD, TI_SESSION_SECRET: secret })!;
+    const token = createSessionToken(before, now);
+    const after = sessionKey({
+      ...PROD,
+      TI_ADMIN_PASSWORD: "nouveau-mot-de-passe",
+      TI_SESSION_SECRET: secret,
+    })!;
+    expect(verifySessionToken(token, after, now + 1000)).toBe(false);
+  });
+
+  it("la clé n'est pas un simple HMAC du mot de passe (dérivation scrypt)", async () => {
+    const { createHmac } = await import("node:crypto");
+    const naive = createHmac("sha256", "touba-infos/admin-session/v1")
+      .update("password:mot-de-passe-prod")
+      .digest();
+    expect(sessionKey(PROD)!.equals(naive)).toBe(false);
+    expect(sessionKey(PROD)!.equals(sessionKey(PROD)!)).toBe(true);
+  });
+});
+
+describe("mots de passe par défaut connus", () => {
+  it.each(["change-me", "touba-infos", "Password", "admin"])(
+    "« %s » est refusé en production",
+    (pw) => {
+      expect(
+        resolveAdminPassword({ NODE_ENV: "production", TI_ADMIN_PASSWORD: pw }),
+      ).toBeNull();
+    },
+  );
+
+  it("reste utilisable en développement local", () => {
+    expect(
+      resolveAdminPassword({
+        NODE_ENV: "development",
+        TI_ADMIN_PASSWORD: "change-me",
+      }),
+    ).toBe("change-me");
+  });
+
+  it("un mot de passe court reste accepté (compatibilité) mais signalé", () => {
+    expect(
+      resolveAdminPassword({
+        NODE_ENV: "production",
+        TI_ADMIN_PASSWORD: "court1",
+      }),
+    ).toBe("court1");
+    expect(isWeakPassword("court1")).toBe(true);
+    expect(isWeakPassword("un-mot-de-passe-long")).toBe(false);
   });
 });

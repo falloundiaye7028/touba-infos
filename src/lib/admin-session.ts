@@ -7,8 +7,12 @@
 //  • Le cookie ne contient plus le mot de passe : il porte un jeton signé
 //    (HMAC-SHA256) avec date d'émission et d'expiration. Le voler ne révèle
 //    pas le mot de passe, et le jeton expire seul.
-//  • Changer TI_ADMIN_PASSWORD (ou TI_SESSION_SECRET) invalide toutes les
-//    sessions ouvertes.
+//  • La clé de signature combine le mot de passe ET TI_SESSION_SECRET (s'il
+//    existe), via scrypt : changer l'un OU l'autre invalide toutes les
+//    sessions, et un cookie volé ne permet pas de tester rapidement des mots
+//    de passe hors ligne.
+//  • En production, les mots de passe par défaut connus (« change-me »,
+//    « touba-infos »…) sont refusés comme s'ils n'étaient pas définis.
 //  • Comparaisons à temps constant.
 // ============================================================================
 
@@ -16,6 +20,7 @@ import {
   createHash,
   createHmac,
   randomBytes,
+  scryptSync,
   timingSafeEqual,
 } from "node:crypto";
 
@@ -28,18 +33,48 @@ export const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const TOKEN_VERSION = "v1";
 const CLOCK_SKEW_MS = 60 * 1000;
 
+/** Valeurs d'exemple ou par défaut, jamais acceptées en production. */
+const KNOWN_DEFAULT_PASSWORDS = new Set([
+  "change-me",
+  "changeme",
+  "touba-infos",
+  "toubainfos",
+  "password",
+  "admin",
+  "motdepasse",
+]);
+
+/** Longueur recommandée ; en dessous, un avertissement est journalisé. */
+export const RECOMMENDED_PASSWORD_LENGTH = 12;
+
+/** Paramètres scrypt (≈ 16 Mo, quelques dizaines de ms, clé mise en cache). */
+const SCRYPT = { N: 2 ** 14, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
+
 function isProduction(env: Env): boolean {
   return env.NODE_ENV === "production";
 }
 
 /**
  * Mot de passe attendu, ou null si la connexion doit être refusée
- * (production sans TI_ADMIN_PASSWORD).
+ * (production sans TI_ADMIN_PASSWORD, ou avec une valeur par défaut connue).
  */
 export function resolveAdminPassword(env: Env = process.env): string | null {
   const configured = env.TI_ADMIN_PASSWORD;
-  if (configured && configured.length > 0) return configured;
+  if (configured && configured.length > 0) {
+    if (
+      isProduction(env) &&
+      KNOWN_DEFAULT_PASSWORDS.has(configured.trim().toLowerCase())
+    ) {
+      return null;
+    }
+    return configured;
+  }
   return isProduction(env) ? null : DEV_FALLBACK_PASSWORD;
+}
+
+/** Vrai si le mot de passe est plus court que la longueur recommandée. */
+export function isWeakPassword(password: string): boolean {
+  return password.length < RECOMMENDED_PASSWORD_LENGTH;
 }
 
 function digest(value: string): Buffer {
@@ -59,20 +94,28 @@ export function verifyAdminPassword(
   return safeEqualStrings(candidate, expected);
 }
 
+let cachedKey: { id: string; key: Buffer } | null = null;
+
 /**
- * Clé de signature des sessions, dérivée de TI_SESSION_SECRET s'il existe,
- * sinon du mot de passe. Null si la connexion est désactivée.
+ * Clé de signature des sessions : scrypt(mot de passe, sel = libellé +
+ * TI_SESSION_SECRET). Null si la connexion est désactivée. La dérivation,
+ * volontairement lente, n'est faite qu'une fois par instance (cache).
  */
 export function sessionKey(env: Env = process.env): Buffer | null {
   const password = resolveAdminPassword(env);
   if (!password) return null;
-  const base =
-    env.TI_SESSION_SECRET && env.TI_SESSION_SECRET.length > 0
-      ? `secret:${env.TI_SESSION_SECRET}`
-      : `password:${password}`;
-  return createHmac("sha256", "touba-infos/admin-session/v1")
-    .update(base, "utf8")
-    .digest();
+  const salt = `touba-infos/admin-session/v1|${env.TI_SESSION_SECRET ?? ""}`;
+
+  const id = createHash("sha256")
+    .update(salt, "utf8")
+    .update("\0")
+    .update(password, "utf8")
+    .digest("hex");
+  if (cachedKey?.id === id) return cachedKey.key;
+
+  const key = scryptSync(password, salt, 32, SCRYPT);
+  cachedKey = { id, key };
+  return key;
 }
 
 function sign(payload: string, key: Buffer): string {
