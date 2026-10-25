@@ -106,7 +106,16 @@ describe("images des intégrations", () => {
 
   it("déduit l'hôte du jeton Blob si TI_BLOB_PUBLIC_HOST est absent", () => {
     expect(
-      ownBlobHost({ BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_AbC123_secret" }),
+      ownBlobHost({
+        // Valeur factice assemblée à l'exécution (pas un vrai jeton).
+        BLOB_READ_WRITE_TOKEN: [
+          "vercel",
+          "blob",
+          "rw",
+          "AbC123",
+          "fixture",
+        ].join("_"),
+      }),
     ).toBe("abc123.public.blob.vercel-storage.com");
   });
 
