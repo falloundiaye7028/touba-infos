@@ -156,12 +156,16 @@ function estPublic(a: ArticleInfo): boolean {
 }
 
 /**
- * Vrai si l'article a été généré par l'intégration AMY IA.
- * L'endpoint incoming écrit `metadata.generatedBy = "amy-ia-solutions"`.
+ * Vrai si l'article a été préparé par une intégration IA :
+ * AMY IA (`metadata.generatedBy = "amy-ia-solutions"`) ou le connecteur
+ * Claude (`metadata.generatedBy = "claude-mcp"`).
  */
 export function isAIGenerated(a: ArticleInfo): boolean {
   const generatedBy = a.metadata?.generatedBy;
-  return typeof generatedBy === "string" && generatedBy.startsWith("amy-ia");
+  return (
+    typeof generatedBy === "string" &&
+    (generatedBy.startsWith("amy-ia") || generatedBy === "claude-mcp")
+  );
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -392,7 +396,7 @@ export async function adminDelete(id: string): Promise<void> {
   }
 }
 
-/** Liste les brouillons générés par AMY IA en attente de validation. */
+/** Liste les brouillons générés par une intégration IA, en attente de validation. */
 export async function listAIDrafts(): Promise<ArticleInfo[]> {
   return (await adminListAll()).filter(
     (a) => isAIGenerated(a) && (a.statut ?? "publie") === "brouillon",

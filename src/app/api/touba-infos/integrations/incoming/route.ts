@@ -1,8 +1,11 @@
-import { put } from "@vercel/blob";
+import { randomUUID } from "node:crypto";
+
 import { NextResponse } from "next/server";
 
+import { sanitizeArticleHtml, textLength } from "@/lib/integrations/content";
+import { createIntegrationDraft } from "@/lib/integrations/draft-service";
 import { verifyIntegrationToken } from "@/lib/integrations/amy-auth";
-import { adminCreate } from "@/lib/touba-infos-store";
+import { rateLimit } from "@/lib/rateLimit";
 import { amyIncomingSchema } from "@/lib/validation/amy-incoming";
 
 export const runtime = "nodejs";
@@ -10,106 +13,13 @@ export const dynamic = "force-dynamic";
 
 const RATE_LIMIT_MAX = 100;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
-const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_BODY_CHARS = 250_000;
 
-const ALLOWED_IMAGE_HOSTS = ["seneweb.com", "lesoleil.sn", "aps.sn", "rfi.fr"];
-
-const ALLOWED_IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
-
-const rateLimitStore = new Map<
-  string,
-  { count: number; resetAt: number }
->();
-
-function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-  if (!entry || entry.resetAt < now) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT_MAX) return false;
-  entry.count += 1;
-  return true;
-}
-
-function isAllowedImageHost(imageUrl: string): boolean {
-  try {
-    const host = new URL(imageUrl).hostname.toLowerCase();
-    return ALLOWED_IMAGE_HOSTS.some(
-      (allowed) => host === allowed || host.endsWith(`.${allowed}`),
-    );
-  } catch {
-    return false;
-  }
-}
-
-function imageExtensionFromContentType(contentType: string): string {
-  if (contentType.includes("png")) return "png";
-  if (contentType.includes("webp")) return "webp";
-  return "jpg";
-}
-
-async function downloadAndStoreImage(
-  imageUrl: string,
-): Promise<string | null> {
-  if (!isAllowedImageHost(imageUrl)) return null;
-
-  const controller = new AbortController();
-  const timer = setTimeout(
-    () => controller.abort(),
-    IMAGE_DOWNLOAD_TIMEOUT_MS,
-  );
-
-  try {
-    const response = await fetch(imageUrl, {
-      signal: controller.signal,
-      headers: { Accept: "image/*" },
-    });
-
-    if (!response.ok) return null;
-
-    const contentType = (response.headers.get("content-type") ?? "")
-      .toLowerCase()
-      .split(";")[0]
-      .trim();
-    if (!ALLOWED_IMAGE_TYPES.has(contentType)) return null;
-
-    const contentLength = Number(response.headers.get("content-length") ?? "0");
-    if (Number.isFinite(contentLength) && contentLength > MAX_IMAGE_BYTES) {
-      return null;
-    }
-
-    const blob = await response.blob();
-    if (blob.size > MAX_IMAGE_BYTES) return null;
-
-    if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
-
-    const extension = imageExtensionFromContentType(contentType);
-    const stored = await put(
-      `touba-infos/articles/rss-${Date.now()}.${extension}`,
-      blob,
-      { access: "public", addRandomSuffix: true, contentType },
-    );
-
-    return stored.url;
-  } catch (error) {
-    console.warn("[amy-incoming] image non stockée", {
-      imageUrl,
-      message: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
+// Ce point d'entrée ne fait qu'UNE chose : créer un brouillon.
+// Aucune méthode GET/PUT/PATCH/DELETE n'est exportée ; Next.js répond 405.
 export async function POST(request: Request): Promise<Response> {
+  const requestId = randomUUID();
+
   if (!verifyIntegrationToken(request.headers.get("authorization"))) {
     return NextResponse.json(
       { ok: false, error: "Non autorisé." },
@@ -117,16 +27,24 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  if (!checkRateLimit("amy-incoming")) {
+  if (!rateLimit("amy-incoming", RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS).allowed) {
     return NextResponse.json(
       { ok: false, error: "Limite de débit atteinte (100 req/h)." },
       { status: 429 },
     );
   }
 
+  const raw = await request.text();
+  if (raw.length > MAX_BODY_CHARS) {
+    return NextResponse.json(
+      { ok: false, error: "Payload trop volumineux." },
+      { status: 413 },
+    );
+  }
+
   let json: unknown;
   try {
-    json = await request.json();
+    json = JSON.parse(raw);
   } catch {
     return NextResponse.json(
       { ok: false, error: "Payload JSON invalide." },
@@ -143,30 +61,31 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const input = parsed.data;
+  const contenuHtml = sanitizeArticleHtml(input.body);
+  if (textLength(contenuHtml) === 0) {
+    return NextResponse.json(
+      { ok: false, error: "Contenu vide après nettoyage." },
+      { status: 400 },
+    );
+  }
 
-  const storedImageUrl = input.imageUrl
-    ? await downloadAndStoreImage(input.imageUrl)
-    : null;
-
-  const article = await adminCreate({
+  const { article, duplicate } = await createIntegrationDraft({
+    origin: "amy-ia-solutions",
     titre: input.title,
+    contenuHtml,
     categorie: input.categorie,
-    auteur: "Rédaction Touba Infos",
-    extrait: input.meta?.description ?? "",
-    tags: input.meta?.keywords ?? [],
-    imageUrl: storedImageUrl ?? input.imageUrl,
-    contenu: input.body,
-    statut: "brouillon",
-    metadata: {
-      sourceUrl: input.sourceUrl ?? null,
-      socialPosts: input.socialPosts ?? null,
-      generatedBy: "amy-ia-solutions",
-    },
+    extrait: input.meta?.description,
+    tags: input.meta?.keywords,
+    imageUrl: input.imageUrl,
+    sourceUrl: input.sourceUrl,
+    socialPosts: input.socialPosts,
+    requestId,
   });
 
-  console.info("[amy-incoming] brouillon créé", {
+  console.info("[amy-incoming] brouillon", {
+    requestId,
     articleId: article.id,
-    sourceUrl: input.sourceUrl ?? null,
+    duplicate,
   });
 
   return NextResponse.json(
@@ -174,7 +93,8 @@ export async function POST(request: Request): Promise<Response> {
       ok: true,
       articleId: article.id,
       draftUrl: `/admin/articles/${article.id}`,
+      duplicate,
     },
-    { status: 201 },
+    { status: duplicate ? 200 : 201 },
   );
 }
