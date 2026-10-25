@@ -8,6 +8,12 @@ import { loginAction } from "../actions";
 export default function AdminLogin() {
   const params = useSearchParams();
   const error = params.get("error");
+  const message =
+    error === "limit"
+      ? "Trop de tentatives. Réessayez dans 15 minutes."
+      : error === "config"
+        ? "Connexion indisponible : mot de passe administrateur non configuré."
+        : "Mot de passe incorrect.";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-100 px-4">
@@ -24,7 +30,7 @@ export default function AdminLogin() {
 
         {error && (
           <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-medium text-red-700">
-            Mot de passe incorrect.
+            {message}
           </p>
         )}
 

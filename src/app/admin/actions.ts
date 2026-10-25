@@ -1,30 +1,52 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import * as store from "@/lib/touba-infos-store";
-import { TI_COOKIE, expectedPassword, isAuthed } from "@/lib/touba-infos-admin";
+import { TI_COOKIE, isAuthed } from "@/lib/touba-infos-admin";
+import {
+  createSessionToken,
+  resolveAdminPassword,
+  sessionCookieOptions,
+  sessionKey,
+  verifyAdminPassword,
+} from "@/lib/admin-session";
+import { rateLimit } from "@/lib/rateLimit";
 import type {
   CategorieInfo,
   GenreInfo,
   StatutInfo,
 } from "@/lib/touba-infos";
 
+const LOGIN_ATTEMPTS = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
 // ── Auth ────────────────────────────────────────────────────────────────────
 export async function loginAction(formData: FormData) {
+  const ip =
+    (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "inconnue";
+  if (!rateLimit(`admin-login:${ip}`, LOGIN_ATTEMPTS, LOGIN_WINDOW_MS).allowed) {
+    redirect("/admin?error=limit");
+  }
+
+  const expected = resolveAdminPassword();
+  const key = sessionKey();
+  if (!expected || !key) {
+    console.error(
+      "[admin] connexion désactivée : TI_ADMIN_PASSWORD n'est pas défini.",
+    );
+    redirect("/admin?error=config");
+  }
+
   const pw = String(formData.get("password") ?? "");
-  if (pw !== expectedPassword()) {
+  if (!verifyAdminPassword(pw, expected)) {
     redirect("/admin?error=auth");
   }
+
   const jar = await cookies();
-  jar.set(TI_COOKIE, expectedPassword(), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 8,
-  });
+  jar.set(TI_COOKIE, createSessionToken(key), sessionCookieOptions());
   redirect("/admin");
 }
 
