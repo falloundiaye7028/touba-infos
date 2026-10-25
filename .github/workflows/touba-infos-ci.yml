@@ -69,6 +69,15 @@ jobs:
         env:
           RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}~1..{0}', github.sha) }}
         run: |
+          set +e
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
-            detect --source /repo --no-banner --redact --verbose \
-            --log-opts="$RANGE"
+            detect --source /repo --no-banner --redact \
+            --config /repo/.gitleaks.toml \
+            --log-opts="$RANGE" \
+            --report-format json --report-path /repo/gitleaks-report.json
+          status=$?
+          # Constats publiés en annotations (valeurs masquées par --redact).
+          if [ -s gitleaks-report.json ]; then
+            jq -r '.[] | "::error file=\(.File),line=\(.StartLine)::gitleaks \(.RuleID) (commit \(.Commit[0:7]))"' gitleaks-report.json
+          fi
+          exit $status

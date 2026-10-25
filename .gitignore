@@ -37,3 +37,6 @@ prisma/*.db
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 .env*
+
+# Rapport gitleaks (CI)
+gitleaks-report.json
